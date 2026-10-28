@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pago</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Fraunces:wght@500&display=swap">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<header class="topbar"><img src="/logo.svg" alt=""><span class="brand">Octomation</span></header>
+<main class="wrap">
+  <section class="step">
+    <div class="step-head"><span class="num">3</span><h1>Pago</h1></div>
+    <div class="step-body">
+      <h2>Medio de pago</h2>
+      <p class="lead" id="resumen"></p>
+      <p class="lead">Selecciona el medio de pago que más te acomode</p>
+      <div class="option">
+        <span>Pagar con <b>OneClick</b></span>
+        <svg width="34" height="34" viewBox="0 0 34 34" aria-label="Seleccionado"><circle cx="17" cy="17" r="15" fill="none" stroke="var(--cyan)" stroke-width="2.5"/><path d="M10 17.5l5 5 9-10.5" fill="none" stroke="var(--cyan)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <label class="check"><input type="checkbox" id="tyc"><span>Declaro que he leído y acepto los <a href="#" target="_blank" rel="noopener">términos y condiciones</a>.</span></label>
+      <button class="btn block" id="pagar" disabled>Pagar</button>
+      <p class="err" id="err" role="alert"></p>
+    </div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const id = new URLSearchParams(location.search).get("o");
+fetch("/api/pedido/" + id).then(r => r.ok ? r.json() : Promise.reject()).then(p => {
+  $("resumen").innerHTML = `${p.plan.nombre}: <b>$${p.plan.precio.toLocaleString("es-CL")}</b>`;
+}).catch(() => location.replace("/"));
+$("tyc").addEventListener("change", () => { $("pagar").disabled = !$("tyc").checked; });
+$("pagar").addEventListener("click", async () => {
+  $("pagar").disabled = true; $("err").textContent = "";
+  try {
+    const r = await fetch("/api/pagar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    const f = document.createElement("form");
+    f.method = "POST"; f.action = d.url;
+    f.innerHTML = `<input type="hidden" name="TBK_TOKEN" value="${d.token}">`;
+    document.body.appendChild(f); f.submit();
+  } catch (x) { $("err").textContent = x.message || "No se pudo iniciar el pago."; $("pagar").disabled = false; }
+});
+</script>
+</body>
+</html>

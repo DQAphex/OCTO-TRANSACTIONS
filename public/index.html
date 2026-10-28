@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Suscripciones</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Fraunces:wght@500&display=swap">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<header class="topbar"><img src="/logo.svg" alt=""><span class="brand">Octomation</span></header>
+<main class="wrap">
+  <section class="step">
+    <div class="step-head"><span class="num">1</span><h1>Suscripción</h1></div>
+    <div class="step-body">
+      <h2>Elige tu suscripción</h2>
+      <p class="lead">Selecciona el plan que más te acomode.</p>
+      <div class="planes" id="planes"></div>
+    </div>
+  </section>
+</main>
+<script>
+const colores = { bronce: "var(--bronce)", plata: "var(--plata)", oro: "var(--oro)" };
+fetch("/api/planes").then(r => r.json()).then(p => {
+  document.getElementById("planes").innerHTML = Object.entries(p).map(([id, x]) =>
+    `<div class="plan"><span class="dot" style="background:${colores[id]}"></span><span class="nombre">${x.nombre}</span><span class="precio">$${x.precio.toLocaleString("es-CL")}</span><a class="btn sm" href="datos.html?plan=${id}">Escoger esta suscripción</a></div>`).join("");
+});
+</script>
+</body>
+</html>

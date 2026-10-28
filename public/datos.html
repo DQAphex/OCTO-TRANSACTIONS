@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Datos personales</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Fraunces:wght@500&display=swap">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<header class="topbar"><img src="/logo.svg" alt=""><span class="brand">Octomation</span></header>
+<main class="wrap">
+  <section class="step">
+    <div class="step-head"><span class="num">2</span><h1>Datos personales</h1></div>
+    <div class="step-body">
+      <p class="lead" id="resumen"></p>
+      <form id="f" novalidate>
+        <div class="grid">
+          <div class="field full"><label for="email">Correo electrónico*</label><input id="email" type="email" autocomplete="email" required></div>
+          <div class="field"><label for="nombre">Nombre*</label><input id="nombre" autocomplete="given-name" required></div>
+          <div class="field"><label for="apellido">Apellido*</label><input id="apellido" autocomplete="family-name" required></div>
+          <div class="field"><label for="rut">Rut*</label><input id="rut" placeholder="12.345.678-5" required></div>
+          <div class="field"><label for="tel">Teléfono*</label><div class="tel"><span class="pref">+56</span><input id="tel" type="tel" inputmode="numeric" maxlength="9" placeholder="912345678" autocomplete="tel-national" required></div></div>
+          <div class="field"><label for="genero">Género</label>
+            <select id="genero"><option value="">Selecciona</option><option>Femenino</option><option>Masculino</option><option>Otro</option><option>Prefiero no decirlo</option></select></div>
+          <div class="field"><label for="nac">Fecha de nacimiento*</label><input id="nac" type="date" required></div>
+        </div>
+        <p class="err" id="err" role="alert"></p>
+        <button class="btn block" id="seguir" type="submit">Continuar al pago</button>
+      </form>
+    </div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const plan = new URLSearchParams(location.search).get("plan");
+$("nac").max = new Date().toISOString().slice(0, 10);
+
+fetch("/api/planes").then(r => r.json()).then(p => {
+  if (!p[plan]) return location.replace("/");
+  $("resumen").innerHTML = `Elegiste la <b>${p[plan].nombre}</b> por <b>$${p[plan].precio.toLocaleString("es-CL")}</b>. <a href="/">Cambiar</a>`;
+});
+
+function rutOk(v) {
+  const c = v.replace(/[^0-9kK]/g, "").toUpperCase();
+  if (c.length < 8) return false;
+  let s = 0, m = 2;
+  for (let i = c.length - 2; i >= 0; i--) { s += +c[i] * m; m = m === 7 ? 2 : m + 1; }
+  const r = 11 - (s % 11), dv = r === 11 ? "0" : r === 10 ? "K" : String(r);
+  return c.slice(-1) === dv;
+}
+$("rut").addEventListener("blur", () => {
+  const c = $("rut").value.replace(/[^0-9kK]/g, "").toUpperCase();
+  if (c.length > 1) $("rut").value = c.slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, ".") + "-" + c.slice(-1);
+});
+$("tel").addEventListener("input", () => { $("tel").value = $("tel").value.replace(/\D/g, ""); });
+
+$("f").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const reglas = {
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($("email").value.trim()),
+    nombre: !!$("nombre").value.trim(), apellido: !!$("apellido").value.trim(),
+    rut: rutOk($("rut").value), tel: /^\d{9}$/.test($("tel").value),
+    nac: !!$("nac").value && $("nac").value <= $("nac").max,
+  };
+  let malo = null;
+  for (const [id, ok] of Object.entries(reglas)) { $(id).setAttribute("aria-invalid", !ok); if (!ok && !malo) malo = id; }
+  $("err").textContent = "";
+  if (malo) { $("err").textContent = "Revisa los campos marcados."; $(malo).focus(); return; }
+  $("seguir").disabled = true;
+  try {
+    const r = await fetch("/api/pedido", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      plan, email: $("email").value, nombre: $("nombre").value, apellido: $("apellido").value, rut: $("rut").value,
+      telefono: $("tel").value, genero: $("genero").value, nacimiento: $("nac").value }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    location.href = "pago.html?o=" + d.id;
+  } catch (x) { $("err").textContent = x.message; $("seguir").disabled = false; }
+});
+</script>
+</body>
+</html>

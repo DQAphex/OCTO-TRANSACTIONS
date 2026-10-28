@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Suscripciones compradas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Fraunces:wght@500&display=swap">
+<link rel="stylesheet" href="/estilos.css">
+</head>
+<body>
+<header class="topbar"><img src="/logo.svg" alt=""><span class="brand">Octomation</span></header>
+<main class="wrap ancho">
+  <section id="lista">
+    <div class="step-head"><h1>Suscripciones compradas</h1></div>
+    <div class="pad">
+      <div class="kpis">
+        <div class="kpi"><small>Compras</small><b id="kn">0</b></div>
+        <div class="kpi"><small>Total vendido</small><b id="kt">$0</b></div>
+      </div>
+      <input id="buscar" class="buscar" type="search" placeholder="Buscar por nombre, correo, RUT, plan u orden" aria-label="Buscar">
+      <div class="tabla"><table>
+        <thead><tr><th>Fecha</th><th>Cliente</th><th>Correo</th><th>Suscripción</th><th class="der">Monto</th><th></th></tr></thead>
+        <tbody id="filas"><tr><td colspan="6" class="vacio">Cargando…</td></tr></tbody>
+      </table></div>
+    </div>
+  </section>
+  <section id="detalle" class="det" hidden>
+    <div class="step-head"><h1>Detalle de la suscripción</h1></div>
+    <div class="pad"><p><a href="#" id="volver">← Volver a la lista</a><button type="button" class="link-del" id="del-det">Eliminar esta suscripción</button></p><div id="det"></div></div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const clp = (n) => "$" + Number(n).toLocaleString("es-CL");
+const fecha = (f) => { const d = new Date(f); return isNaN(d) ? esc(f || "—") : d.toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" }); };
+const nac = (s) => (s || "").split("-").reverse().join("-") || "—";
+let datos = [];
+
+async function cargar() {
+  const r = await fetch("/api/admin/suscripciones");
+  if (!r.ok) { $("filas").innerHTML = '<tr><td colspan="6" class="vacio">No se pudo cargar la lista.</td></tr>'; return; }
+  datos = await r.json(); pintar(); ruta();
+}
+function pintar() {
+  const q = $("buscar").value.toLowerCase();
+  const v = datos.filter((d) => [d.cliente.nombre, d.cliente.apellido, d.cliente.email, d.cliente.rut, d.plan, d.pago.orden].join(" ").toLowerCase().includes(q));
+  $("kn").textContent = v.length;
+  $("kt").textContent = clp(v.reduce((s, d) => s + d.pago.monto, 0));
+  $("filas").innerHTML = v.length ? v.map((d) => `<tr><td>${fecha(d.pago.fecha)}</td><td>${esc(d.cliente.nombre)} ${esc(d.cliente.apellido)}</td><td>${esc(d.cliente.email)}</td><td>${esc(d.plan)}</td><td class="der">${clp(d.pago.monto)}</td><td class="der"><a href="#${esc(d.id)}">Ver detalle</a><button type="button" class="link-del" data-id="${esc(d.id)}">Eliminar</button></td></tr>`).join("")
+    : '<tr><td colspan="6" class="vacio">No hay suscripciones que mostrar.</td></tr>';
+}
+function fila(k, v) { return `<dt>${k}</dt><dd>${v}</dd>`; }
+function ruta() {
+  const d = datos.find((x) => x.id === location.hash.slice(1));
+  $("lista").hidden = !!d; $("detalle").hidden = !d;
+  if (!d) return;
+  $("del-det").dataset.id = d.id;
+  const c = d.cliente, p = d.pago;
+  $("det").innerHTML = `
+    <h3>Suscripción</h3><dl>${fila("Plan", esc(d.plan))}${fila("Monto", clp(p.monto))}${fila("Fecha de compra", fecha(p.fecha))}</dl>
+    <h3>Pago</h3><dl>${fila("Orden de compra", esc(p.orden))}${fila("Código de autorización", esc(p.autorizacion))}${fila("Tarjeta", "•••• " + esc(String(p.tarjeta || "").slice(-4)))}${fila("Medio de pago", "Webpay OneClick")}</dl>
+    <h3>Cliente</h3><dl>${fila("Nombre", esc(c.nombre) + " " + esc(c.apellido))}${fila("RUT", esc(c.rut))}${fila("Correo", esc(c.email))}${fila("Teléfono", esc(c.telefono))}${fila("Género", esc(c.genero || "—"))}${fila("Fecha de nacimiento", esc(nac(c.nacimiento)))}</dl>`;
+  scrollTo(0, 0);
+}
+async function eliminar(id) {
+  const d = datos.find((x) => x.id === id);
+  if (!d) return;
+  if (!confirm(`¿Eliminar la suscripción ${d.plan} de ${d.cliente.nombre} ${d.cliente.apellido}?\n\nSe borra el registro y la tarjeta inscrita. No se devuelve el dinero.`)) return;
+  const r = await fetch("/api/admin/suscripciones/" + encodeURIComponent(id), { method: "DELETE" });
+  if (!r.ok) { alert("No se pudo eliminar."); return; }
+  const res = await r.json();
+  datos = datos.filter((x) => x.id !== id);
+  history.pushState(null, "", location.pathname);
+  pintar(); ruta();
+  if (!res.tarjeta) alert("El registro se eliminó, pero no se pudo borrar la tarjeta inscrita en Transbank. Revisa la consola del servidor.");
+}
+document.addEventListener("click", (e) => { const b = e.target.closest(".link-del"); if (b) eliminar(b.dataset.id); });
+$("buscar").addEventListener("input", pintar);
+$("volver").addEventListener("click", (e) => { e.preventDefault(); history.pushState(null, "", location.pathname); ruta(); });
+addEventListener("hashchange", ruta);
+cargar();
+</script>
+</body>
+</html>
