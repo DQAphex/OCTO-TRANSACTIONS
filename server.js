@@ -6,7 +6,7 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const { Oneclick, TransactionDetail, Options, IntegrationApiKeys, IntegrationCommerceCodes, Environment } = require("transbank-sdk");
 
-const PORT = process.env.PORT || 4006;
+const PORT = process.env.PORT || 4003;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 
 // ── Transbank Oneclick Mall ──────────────────────────────────────────────
